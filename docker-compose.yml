@@ -1,24 +1,24 @@
 services:
   ollama:
-    image: ollama/ollama
+    image: ollama/ollama # Base image, model is pulled by command
     ports:
-      - "11434:11434"
+      - "${OLLAMA_HOST_PORT:-11434}:11434"
     volumes:
       - ./ollama_data:/root/.ollama
     deploy:
       resources:
         reservations:
           devices:
-            - driver: nvidia
+            - driver: nvidia # GPU support is optional, remove if not needed or causes issues
               count: 1
               capabilities: [gpu]
-    command: sh -c "ollama pull all-minilm:l6-v2 && ollama serve"
+    command: sh -c "ollama pull ${OLLAMA_MODEL_TAG:-all-minilm:l6-v2} && ollama serve"
 
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:latest # Consider parameterizing QDRANT_IMAGE_TAG if needed
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "${QDRANT_HOST_HTTP_PORT:-6333}:6333" # HTTP port
+      - "${QDRANT_HOST_GRPC_PORT:-6334}:6334" # gRPC port
     volumes:
       - ./qdrant_data:/qdrant/storage
     environment:

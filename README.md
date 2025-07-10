@@ -44,10 +44,17 @@ This project implements an ETL (Extract, Transform, Load) process to fetch conte
     - `CONFLUENCE_SPACE_KEY`: The key of the Confluence space you want to index.
 
     **Default `.env` variables (can be overridden):**
-    - `OLLAMA_API_URL=http://localhost:11434/api/embeddings`
-    - `OLLAMA_EMBEDDING_MODEL=mxbai-embed-large:latest`
-    - `QDRANT_URL=http://localhost:6333`
-    - `QDRANT_COLLECTION_NAME=confluence_embeddings`
+    - `CONFLUENCE_BASE_URL`, `CONFLUENCE_USERNAME`, `CONFLUENCE_PAT`, `CONFLUENCE_SPACE_KEY`: No defaults, must be provided.
+    - `OLLAMA_API_URL=http://localhost:11434/api/embeddings`: Target URL for Ollama API, used by the ETL script.
+    - `OLLAMA_EMBEDDING_MODEL=all-minilm:l6-v2`: Specifies the model for embeddings in the ETL script (influences vector size calculation) and is sent to the Ollama API.
+    - `OLLAMA_MODEL_TAG=all-minilm:l6-v2`: Model tag used by `docker-compose` to pull the correct Ollama model. Should generally match `OLLAMA_EMBEDDING_MODEL`.
+    - `OLLAMA_HOST_PORT=11434`: Host port mapped to the Ollama container's port 11434.
+    - `QDRANT_URL=http://localhost:6333`: Target URL for the Qdrant API, used by the ETL script.
+    - `QDRANT_COLLECTION_NAME=confluence_embeddings`: Name of the collection in Qdrant.
+    - `QDRANT_HOST_HTTP_PORT=6333`: Host port mapped to Qdrant's HTTP port 6333.
+    - `QDRANT_HOST_GRPC_PORT=6334`: Host port mapped to Qdrant's gRPC port 6334.
+    - `USE_FIXTURE_DATA=false`: Set to `true` to use stubbed Confluence data for local testing without live Confluence access.
+
 
 4.  **Start Ollama and Qdrant services:**
     This command will also pull the `mxbai-embed-large:latest` model for Ollama if it's not already present locally.

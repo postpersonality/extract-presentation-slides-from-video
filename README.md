@@ -46,8 +46,7 @@ This project implements an ETL (Extract, Transform, Load) process to fetch conte
     **Default `.env` variables (can be overridden):**
     - `CONFLUENCE_BASE_URL`, `CONFLUENCE_USERNAME`, `CONFLUENCE_PAT`, `CONFLUENCE_SPACE_KEY`: No defaults, must be provided.
     - `OLLAMA_API_URL=http://localhost:11434/api/embeddings`: Target URL for Ollama API, used by the ETL script.
-    - `OLLAMA_EMBEDDING_MODEL=all-minilm:l6-v2`: Specifies the model for embeddings in the ETL script (influences vector size calculation) and is sent to the Ollama API.
-    - `OLLAMA_MODEL_TAG=all-minilm:l6-v2`: Model tag used by `docker-compose` to pull the correct Ollama model. Should generally match `OLLAMA_EMBEDDING_MODEL`.
+    - `OLLAMA_EMBEDDING_MODEL=all-minilm:l6-v2`: Specifies the model for embeddings. Used by the ETL script (influences vector size calculation and is sent to the Ollama API) AND by `docker-compose` to pull the correct Ollama model.
     - `OLLAMA_HOST_PORT=11434`: Host port mapped to the Ollama container's port 11434.
     - `QDRANT_URL=http://localhost:6333`: Target URL for the Qdrant API, used by the ETL script.
     - `QDRANT_COLLECTION_NAME=confluence_embeddings`: Name of the collection in Qdrant.

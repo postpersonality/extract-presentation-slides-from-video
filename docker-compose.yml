@@ -12,7 +12,7 @@ services:
             - driver: nvidia # GPU support is optional, remove if not needed or causes issues
               count: 1
               capabilities: [gpu]
-    command: sh -c "ollama pull ${OLLAMA_MODEL_TAG:-all-minilm:l6-v2} && ollama serve"
+    command: sh -c "ollama pull ${OLLAMA_EMBEDDING_MODEL:-all-minilm:l6-v2} && ollama serve"
 
   qdrant:
     image: qdrant/qdrant:latest # Consider parameterizing QDRANT_IMAGE_TAG if needed

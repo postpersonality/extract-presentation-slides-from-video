@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# IDE and OS files
+.vscode/
+.DS_Store
+# *.env # Temporarily commenting out for testing purposes as requested by user
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# TypeScript cache
+*.tsbuildinfo

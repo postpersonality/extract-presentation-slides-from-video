@@ -28,7 +28,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@qdrant/js-client-rest": "^1.14.1",
+    "@elastic/elasticsearch": "^8.12.0",
     "axios": "^1.10.0",
     "confluence-api": "^1.4.0",
     "dotenv": "^17.2.0"

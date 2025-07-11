@@ -14,27 +14,27 @@ services:
               capabilities: [gpu]
     command: sh -c "ollama pull ${OLLAMA_EMBEDDING_MODEL:-all-minilm:l6-v2} && ollama serve"
 
-  qdrant:
-    image: qdrant/qdrant:latest # Consider parameterizing QDRANT_IMAGE_TAG if needed
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2 # Use a specific version
     ports:
-      - "${QDRANT_HOST_HTTP_PORT:-6333}:6333" # HTTP port
-      - "${QDRANT_HOST_GRPC_PORT:-6334}:6334" # gRPC port
+      - "${ELASTICSEARCH_HOST_PORT:-9200}:9200"
+      - "${ELASTICSEARCH_TRANSPORT_PORT:-9300}:9300" # Optional, for internode communication if scaling
     volumes:
-      - ./qdrant_data:/qdrant/storage
+      - ./elasticsearch_data:/usr/share/elasticsearch/data
     environment:
-      QDRANT__SERVICE__GRPC_PORT: "6334" # Ensure gRPC port is explicitly set if client expects it
-      # For production, consider setting API keys:
-      # QDRANT_API_KEY: your_api_key_here
-      # QDRANT_READ_ONLY_API_KEY: your_read_only_api_key_here
+      - discovery.type=single-node
+      - xpack.security.enabled=false # For development ease, consider true for production
+      # - ELASTIC_PASSWORD=yoursecurepassword # Set if xpack.security.enabled=true
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m # Adjust memory as needed
     # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+    #   test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s"]
     #   interval: 10s
-    #   timeout: 5s
-    #   retries: 3
-    #   start_period: 10s
+    #   timeout: 10s
+    #   retries: 5
+    #   start_period: 20s
 
 volumes:
   ollama_data:
     driver: local
-  qdrant_data:
+  elasticsearch_data: # New volume for Elasticsearch data
     driver: local

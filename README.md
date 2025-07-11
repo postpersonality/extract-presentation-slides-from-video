@@ -1,14 +1,15 @@
 # Confluence to Vector DB ETL
 
-This project implements an ETL (Extract, Transform, Load) process to fetch content from a Confluence server, generate embeddings using a local Ollama instance, and store them in a Qdrant vector database.
+This project implements an ETL (Extract, Transform, Load) process to fetch content from a Confluence server, generate embeddings using a local Ollama instance, and store them in an Elasticsearch vector database.
 
 ## Features
 
 - Fetches pages from a specified Confluence space.
-- Uses a local Ollama instance with the `mxbai-embed-large:latest` model for generating embeddings.
-- Stores page content and embeddings in a local Qdrant vector database.
+- Uses a local Ollama instance with models like `mxbai-embed-large:latest` or `all-minilm:l6-v2` for generating embeddings.
+- Stores page content and embeddings in a local Elasticsearch instance, configured for vector search.
+- **Provides a search mode to query indexed data by semantic similarity.**
 - Configurable through environment variables.
-- Docker Compose setup for easy deployment of Ollama and Qdrant.
+- Docker Compose setup for easy deployment of Ollama and Elasticsearch.
 
 ## Prerequisites
 
@@ -35,7 +36,7 @@ This project implements an ETL (Extract, Transform, Load) process to fetch conte
     ```bash
     cp .env.example .env
     ```
-    Edit `.env` with your Confluence URL, username (email for PAT), PAT, space key, and any custom Ollama/Qdrant settings if you deviated from the defaults.
+    Edit `.env` with your Confluence URL, username (email for PAT), PAT, space key, and any custom Ollama/Elasticsearch settings if you deviated from the defaults.
 
     **Required `.env` variables:**
     - `CONFLUENCE_BASE_URL`: Your Confluence instance URL (e.g., `https://your-domain.atlassian.net/wiki` or `http://localhost:8090` for local server).
@@ -45,26 +46,29 @@ This project implements an ETL (Extract, Transform, Load) process to fetch conte
 
     **Default `.env` variables (can be overridden):**
     - `CONFLUENCE_BASE_URL`, `CONFLUENCE_USERNAME`, `CONFLUENCE_PAT`, `CONFLUENCE_SPACE_KEY`: No defaults, must be provided.
-    - `OLLAMA_API_URL=http://localhost:11434/api/embeddings`: Target URL for Ollama API, used by the ETL script.
-    - `OLLAMA_EMBEDDING_MODEL=all-minilm:l6-v2`: Specifies the model for embeddings. Used by the ETL script (influences vector size calculation and is sent to the Ollama API) AND by `docker-compose` to pull the correct Ollama model.
-    - `OLLAMA_HOST_PORT=11434`: Host port mapped to the Ollama container's port 11434.
-    - `QDRANT_URL=http://localhost:6333`: Target URL for the Qdrant API, used by the ETL script.
-    - `QDRANT_COLLECTION_NAME=confluence_embeddings`: Name of the collection in Qdrant.
-    - `QDRANT_HOST_HTTP_PORT=6333`: Host port mapped to Qdrant's HTTP port 6333.
-    - `QDRANT_HOST_GRPC_PORT=6334`: Host port mapped to Qdrant's gRPC port 6334.
-    - `USE_FIXTURE_DATA=false`: Set to `true` to use stubbed Confluence data for local testing without live Confluence access.
+    - `OLLAMA_API_URL=http://localhost:11434/api/embeddings`: Target URL for Ollama API.
+    - `OLLAMA_EMBEDDING_MODEL=all-minilm:l6-v2`: Specifies the embedding model. This affects vector dimensions in Elasticsearch and the model pulled by Docker Compose.
+    - `OLLAMA_HOST_PORT=11434`: Host port for the Ollama service.
+    - `ELASTICSEARCH_NODE=http://localhost:9200`: Node URL for the Elasticsearch API, used by the ETL script.
+    - `ELASTICSEARCH_INDEX_NAME=confluence_embeddings`: Name of the index in Elasticsearch.
+    - `ELASTICSEARCH_HOST_PORT=9200`: Host port mapped to Elasticsearch's HTTP port 9200.
+    - `ELASTICSEARCH_USERNAME` (optional): Username for Elasticsearch basic authentication.
+    - `ELASTICSEARCH_PASSWORD` (optional): Password for Elasticsearch basic authentication.
+    - `USE_FIXTURE_DATA=false`: Set to `true` to use stubbed Confluence data for local testing.
+    - `SEARCH_QUERY` (optional): If set, the script runs in search mode using this query string (e.g., `"What are the new features?"`). Otherwise, it runs in ETL mode.
 
 
-4.  **Start Ollama and Qdrant services:**
-    This command will also pull the `mxbai-embed-large:latest` model for Ollama if it's not already present locally.
+4.  **Start Ollama and Elasticsearch services:**
+    This command will also pull the specified `OLLAMA_EMBEDDING_MODEL` for Ollama if it's not already present locally.
     ```bash
     docker-compose up -d
     ```
-    - Ollama will be accessible at `http://localhost:11434`.
-    - Qdrant will be accessible at `http://localhost:6333`.
-    - Data for Ollama and Qdrant will be persisted in `./ollama_data` and `./qdrant_data` directories respectively.
+    - Ollama will be accessible at `http://localhost:${OLLAMA_HOST_PORT:-11434}`.
+    - Elasticsearch will be accessible at `http://localhost:${ELASTICSEARCH_HOST_PORT:-9200}`.
+    - Data for Ollama and Elasticsearch will be persisted in `./ollama_data` and `./elasticsearch_data` directories respectively.
 
-    *Note for GPU users*: The `docker-compose.yml` includes a basic GPU reservation for Ollama. Ensure your Docker setup and NVIDIA drivers support this. If you don't have a GPU or encounter issues, you can remove the `deploy` section from the `ollama` service in `docker-compose.yml`. Ollama will run on CPU by default.
+    *Note for GPU users*: The `docker-compose.yml` includes a basic GPU reservation for Ollama. If you don't have a GPU or encounter issues, remove the `deploy` section from the `ollama` service in `docker-compose.yml`. Ollama will run on CPU.
+    *Elasticsearch Security*: For development, X-Pack security is disabled by default in `docker-compose.yml`. For production, enable it and set `ELASTICSEARCH_USERNAME` and `ELASTICSEARCH_PASSWORD`.
 
 ## Running the ETL Script
 
@@ -84,19 +88,48 @@ This project implements an ETL (Extract, Transform, Load) process to fetch conte
     npm run dev
     ```
 
+## Running in Search Mode
+
+To search the indexed Confluence data:
+
+1.  Ensure your `.env` file is configured, especially `ELASTICSEARCH_NODE`, `ELASTICSEARCH_INDEX_NAME`, and `OLLAMA_API_URL` (for embedding the search query).
+2.  Set the `SEARCH_QUERY` environment variable in your `.env` file or as a prefix to the command. For example:
+    ```bash
+    # In .env file
+    SEARCH_QUERY="your question about confluence pages"
+    ```
+3.  Run the script (after building if not using `npm run dev`):
+    ```bash
+    npm start
+    # OR
+    npm run dev
+    # OR, by prefixing the variable (works in bash-like shells)
+    SEARCH_QUERY="your question" npm start
+    ```
+    The script will output the top K search results to the console.
+
 ## How it Works
 
-1.  The script connects to the Confluence instance using the provided base URL and Personal Access Token.
-2.  It fetches all pages from the specified `CONFLUENCE_SPACE_KEY`, handling pagination.
+The script operates in one of two modes:
+
+**ETL Mode (Default):**
+1.  Connects to the Confluence instance using the provided credentials.
+2.  Fetches all pages from the specified `CONFLUENCE_SPACE_KEY`.
 3.  For each page:
-    a.  The HTML content (`body.storage`) is cleaned to extract plain text.
-    b.  The plain text is sent to the local Ollama API (`/api/embeddings`) to generate a vector embedding using the `mxbai-embed-large` model.
-    c.  The script ensures a Qdrant collection (defined by `QDRANT_COLLECTION_NAME`) exists, creating it if necessary. The collection is configured for vectors of size 1024 (matching `mxbai-embed-large`) using Cosine distance.
-    d.  The page ID, embedding vector, title, cleaned text content, and Confluence page URL are upserted into the Qdrant collection.
+    a.  Cleans HTML content to plain text.
+    b.  Generates a vector embedding for the text using Ollama.
+    c.  Ensures the Elasticsearch index exists with correct mapping (including `dense_vector` for embeddings).
+    d.  Indexes the page ID, embedding, title, content, URL, and other metadata into Elasticsearch.
+
+**Search Mode (if `SEARCH_QUERY` is set):**
+1.  Takes the `SEARCH_QUERY` string.
+2.  Generates a vector embedding for the query using Ollama.
+3.  Performs a k-Nearest Neighbor (kNN) search in Elasticsearch against the `embedding` field of the indexed documents.
+4.  Prints the top K matching documents (title, URL, score, last modified date) to the console.
 
 ## Stopping Services
 
-To stop the Ollama and Qdrant services:
+To stop the Ollama and Elasticsearch services:
 ```bash
 docker-compose down
 ```
@@ -107,14 +140,17 @@ docker-compose down -v
 
 ## Troubleshooting
 
--   **Ollama Model Pull:** If `docker-compose up` fails to pull the Ollama model, you might need to pull it manually first:
+-   **Ollama Model Pull:** If `docker-compose up` fails to pull the Ollama model (e.g., `mxbai-embed-large:latest` or `all-minilm:l6-v2`), you might need to pull it manually first:
     ```bash
-    docker exec -it <ollama_container_name_or_id> ollama pull mxbai-embed-large:latest
+    # Replace <ollama_container_name_or_id> with the actual name/ID
+    # Replace <model_name:tag> with the model specified in your .env
+    docker exec -it <ollama_container_name_or_id> ollama pull <model_name:tag>
     ```
     Then restart the services.
 -   **Confluence API Errors:** Check your `CONFLUENCE_BASE_URL`, `CONFLUENCE_USERNAME`, `CONFLUENCE_PAT`, and `CONFLUENCE_SPACE_KEY` in the `.env` file. Ensure the PAT has the correct permissions.
--   **Qdrant Connection Issues:** Verify Qdrant is running (`docker ps`) and accessible at the configured `QDRANT_URL`.
--   **Embedding Dimension Mismatch:** The Qdrant collection is created with vector size 1024, which is standard for `mxbai-embed-large`. If you use a different model, you'll need to adjust the `size` parameter in `ensureQdrantCollection()` in `src/etl.ts`.
+-   **Elasticsearch Connection Issues:** Verify Elasticsearch is running (`docker ps`) and accessible at the configured `ELASTICSEARCH_NODE`. Check `docker-compose logs elasticsearch` for startup errors.
+-   **Embedding Dimension Mismatch:** The Elasticsearch index mapping for the `embedding` field (`dense_vector`) is created with vector dimensions based on the `OLLAMA_EMBEDDING_MODEL` environment variable (e.g., 1024 for `mxbai-embed-large`, 384 for `all-minilm:l6-v2`). Ensure this matches the model you are using. If you change the model, you may need to delete and recreate the Elasticsearch index for the new dimensions to apply correctly.
+-   **Elasticsearch Health:** You can check Elasticsearch cluster health via `curl http://localhost:${ELASTICSEARCH_HOST_PORT:-9200}/_cluster/health?pretty`. It should be `yellow` or `green` for a single node setup.
 
 ## TODO / Potential Improvements
 

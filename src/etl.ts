@@ -8,11 +8,11 @@ import {
     CONFLUENCE_PAT,
     USE_FIXTURE_DATA,
     QDRANT_COLLECTION_NAME,
-    VECTOR_SIZE,
-    CONFLUENCE_SPACE_KEY
+    VECTOR_SIZE, // Use this instead of recalculating
+    CONFLUENCE_SPACE_KEY // Use this from config
 } from './config';
 import { qdrantClient } from './clients';
-import { getOllamaEmbedding, EmbeddingResponse } from './utils'; // EmbeddingResponse might not be needed here if getOllamaEmbedding handles it internally
+import { getOllamaEmbedding } from './utils'; // Correctly imported
 
 // dotenv.config() is called in config.ts
 
@@ -30,74 +30,46 @@ interface ConfluencePage {
     _expandable?: {
         lastModified?: string;
     };
-    // Add other relevant fields if needed
 }
 
-// Interface EmbeddingResponse is now imported from utils.ts
+// EmbeddingResponse interface is defined in utils.ts and used by the imported getOllamaEmbedding
 
-/**
- * Fetches all pages from a Confluence space.
- * Handles pagination.
- * @param spaceKey The key of the Confluence space.
- * @returns Promise<ConfluencePage[]>
- */
 async function getConfluencePages(spaceKey: string): Promise<ConfluencePage[]> {
     if (USE_FIXTURE_DATA) {
         console.log('Using fixture data for Confluence pages.');
-        // Generate UUIDs for fixture data IDs to be Qdrant compatible
         return [
             {
-                id: uuidv4(), // Qdrant compatible ID
+                id: uuidv4(),
                 title: 'Fixture Page 1 - English & Русский',
-                body: {
-                    storage: {
-                        value: `<h1>Test Page 1</h1><p>This is a test page with <b>English</b> content.</p><p>Это тестовая страница с содержанием на <b>русском</b> языке.</p><p>Mixed content: Hello, мир!</p><ul><li>Item 1</li><li>Элемент 2</li></ul><ac:structured-macro ac:name="code" ac:schema-version="1"><ac:parameter ac:name="language">java</ac:parameter><ac:plain-text-body><![CDATA[public class HelloWorld {\n    public static void main(String[] args) {\n        System.out.println("Hello, World from code block!");\n    }\n}]]></ac:plain-text-body></ac:structured-macro><p>Another sentence. Еще одно предложение.</p>`,
-                    },
-                },
+                body: { storage: { value: `<h1>Test Page 1</h1><p>This is a test page with <b>English</b> content.</p><p>Это тестовая страница с содержанием на <b>русском</b> языке.</p><p>Mixed content: Hello, мир!</p><ul><li>Item 1</li><li>Элемент 2</li></ul><ac:structured-macro ac:name="code" ac:schema-version="1"><ac:parameter ac:name="language">java</ac:parameter><ac:plain-text-body><![CDATA[public class HelloWorld {\n    public static void main(String[] args) {\n        System.out.println("Hello, World from code block!");\n    }\n}]]></ac:plain-text-body></ac:structured-macro><p>Another sentence. Еще одно предложение.</p>` } },
                 space: { key: spaceKey },
                 _expandable: { lastModified: new Date().toISOString() }
             },
             {
-                id: uuidv4(), // Qdrant compatible ID
+                id: uuidv4(),
                 title: 'Fixture Page 2 - Only English',
-                body: {
-                    storage: {
-                        value: `<h2>Another Test Page</h2><p>This page contains only <i>English</i> text. It discusses various topics like <a href="http://example.com">hyperlinks</a> and more.</p><p>&nbsp;</p><p>Some special characters: &amp; &lt; &gt; &quot; &#39;</p>`,
-                    },
-                },
+                body: { storage: { value: `<h2>Another Test Page</h2><p>This page contains only <i>English</i> text. It discusses various topics like <a href="http://example.com">hyperlinks</a> and more.</p><p>&nbsp;</p><p>Some special characters: &amp; &lt; &gt; &quot; &#39;</p>` } },
                 space: { key: spaceKey },
                 _expandable: { lastModified: new Date().toISOString() }
             },
             {
-                id: uuidv4(), // Qdrant compatible ID
+                id: uuidv4(),
                 title: 'Страница на русском языке - Russian Only',
-                body: {
-                    storage: {
-                        value: `<h1>Полностью на русском</h1><p>Эта страница содержит только русский текст. Обсуждаются различные темы, например, <strong>важные вопросы</strong> и <em>разные ответы</em>.</p><p>Пример кода: <code>console.log("Привет, мир!");</code></p>`,
-                    },
-                },
+                body: { storage: { value: `<h1>Полностью на русском</h1><p>Эта страница содержит только русский текст. Обсуждаются различные темы, например, <strong>важные вопросы</strong> и <em>разные ответы</em>.</p><p>Пример кода: <code>console.log("Привет, мир!");</code></p>` } },
                 space: { key: spaceKey },
                 _expandable: { lastModified: new Date().toISOString() }
             },
             {
-                id: uuidv4(), // Qdrant compatible ID
+                id: uuidv4(),
                 title: 'Page with no real content',
-                body: {
-                    storage: {
-                        value: `<p>&nbsp;&nbsp;&nbsp;</p><br />`, // only whitespace and breaks
-                    },
-                },
+                body: { storage: { value: `<p>&nbsp;&nbsp;&nbsp;</p><br />` } },
                 space: { key: spaceKey },
                 _expandable: { lastModified: new Date().toISOString() }
             },
             {
-                id: uuidv4(), // Qdrant compatible ID
+                id: uuidv4(),
                 title: 'Page with empty content value',
-                body: {
-                    storage: {
-                        value: ``,
-                    },
-                },
+                body: { storage: { value: `` } },
                 space: { key: spaceKey },
                 _expandable: { lastModified: new Date().toISOString() }
             }
@@ -106,7 +78,7 @@ async function getConfluencePages(spaceKey: string): Promise<ConfluencePage[]> {
 
     const allPages: ConfluencePage[] = [];
     let start = 0;
-    const limit = 50; // Adjust as needed, Confluence API page limit
+    const limit = 50;
     let isLast = false;
 
     if (!CONFLUENCE_BASE_URL || !CONFLUENCE_USERNAME || !CONFLUENCE_PAT) {
@@ -121,33 +93,21 @@ async function getConfluencePages(spaceKey: string): Promise<ConfluencePage[]> {
             const response = await axios.get(
                 `${CONFLUENCE_BASE_URL}/rest/api/content`,
                 {
-                    headers: {
-                        'Accept': 'application/json',
-                    },
-                    auth: {
-                        username: CONFLUENCE_USERNAME,
-                        password: CONFLUENCE_PAT,
-                    },
-                    params: {
-                        spaceKey: spaceKey,
-                        expand: 'body.storage', // Get page content in storage format
-                        start: start,
-                        limit: limit,
-                    },
+                    headers: { 'Accept': 'application/json' },
+                    auth: { username: CONFLUENCE_USERNAME, password: CONFLUENCE_PAT },
+                    params: { spaceKey: spaceKey, expand: 'body.storage', start: start, limit: limit },
                 }
             );
-
             const pages = response.data.results as ConfluencePage[];
             allPages.push(...pages);
-
-            if (pages.length < limit) { // Check if it's the last page
+            if (pages.length < limit) {
                 isLast = true;
             } else {
                 start += limit;
             }
             console.log(`Fetched ${pages.length} pages, total so far: ${allPages.length}`);
         } catch (e) {
-            const error = e as any; // Cast to any to access response data
+            const error = e as any;
             console.error('Error fetching pages from Confluence:', error.response?.data || error.message);
             throw error;
         }
@@ -156,58 +116,15 @@ async function getConfluencePages(spaceKey: string): Promise<ConfluencePage[]> {
     return allPages;
 }
 
-/**
- * Generates embeddings for a given text using Ollama.
- * @param text The text to embed.
- * @returns Promise<number[]>
- */
-async function getOllamaEmbedding(text: string): Promise<number[]> {
-    try {
-        const response = await axios.post<EmbeddingResponse>(
-            OLLAMA_API_URL,
-            {
-                model: OLLAMA_EMBEDDING_MODEL,
-                prompt: text,
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
-        return response.data.embedding;
-    } catch (e) {
-        const error = e as any; // Cast to any to access response data
-        console.error('Error generating embedding from Ollama:', error.response?.data || error.message);
-        throw error;
-    }
-}
+// Removed the local duplicate of getOllamaEmbedding. The imported one from utils.ts will be used.
 
-/**
- * Cleans HTML content (from Confluence storage format) into plain text.
- * Basic cleaning, can be improved with a more robust HTML-to-text library.
- * @param htmlContent HTML string.
- * @returns Plain text string.
- */
 function cleanHtmlContent(htmlContent: string): string {
-    // Basic cleaning: remove HTML tags. Consider a library for more complex scenarios.
-    let text = htmlContent.replace(/<[^>]*>/g, ' '); // Replace tags with space
-    // Decode HTML entities
-    text = text.replace(/&nbsp;/g, ' ')
-               .replace(/&amp;/g, '&')
-               .replace(/&lt;/g, '<')
-               .replace(/&gt;/g, '>')
-               .replace(/&quot;/g, '"')
-               .replace(/&#39;/g, "'");
-    // Remove extra whitespace
+    let text = htmlContent.replace(/<[^>]*>/g, ' ');
+    text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
     text = text.replace(/\s+/g, ' ').trim();
     return text;
 }
 
-
-/**
- * Ensures the Qdrant collection exists.
- */
 async function ensureQdrantCollection() {
     try {
         const collections = await qdrantClient.getCollections();
@@ -215,14 +132,10 @@ async function ensureQdrantCollection() {
 
         if (!collectionExists) {
             console.log(`Collection '${QDRANT_COLLECTION_NAME}' does not exist. Creating it...`);
-            // Define the vector parameters based on the OLLAMA_EMBEDDING_MODEL
-            // Dimension for all-minilm:l6-v2 is 384.
-            // Dimension for mxbai-embed-large is 1024.
-            const vectorSize = OLLAMA_EMBEDDING_MODEL === 'all-minilm:l6-v2' ? 384 : 1024;
             await qdrantClient.createCollection(QDRANT_COLLECTION_NAME, {
                 vectors: {
-                    size: vectorSize,
-                    distance: 'Cosine', // Or 'Euclid', 'Dot'
+                    size: VECTOR_SIZE, // Use VECTOR_SIZE from config
+                    distance: 'Cosine',
                 },
             });
             console.log(`Collection '${QDRANT_COLLECTION_NAME}' created successfully.`);
@@ -235,24 +148,16 @@ async function ensureQdrantCollection() {
     }
 }
 
-/**
- * Upserts a document (page) with its embedding into Qdrant.
- * @param page The Confluence page.
- * @param embedding The embedding vector.
- */
 async function upsertToQdrant(page: ConfluencePage, embedding: number[], textContent: string) {
     let qdrantId: number | string;
 
     if (USE_FIXTURE_DATA) {
-        // Fixture data IDs are already UUIDs (strings)
         qdrantId = page.id;
     } else {
-        // For real Confluence data, try to parse ID as integer
         const parsedId = parseInt(page.id, 10);
         if (!isNaN(parsedId)) {
             qdrantId = parsedId;
         } else {
-            // If Confluence ID is not a number (unexpected, but good to handle), generate a UUID
             console.warn(`Confluence page ID "${page.id}" is not an integer. Generating UUID for Qdrant point.`);
             qdrantId = uuidv4();
         }
@@ -265,13 +170,12 @@ async function upsertToQdrant(page: ConfluencePage, embedding: number[], textCon
                     id: qdrantId,
                     vector: embedding,
                     payload: {
-                        confluencePageId: page.id, // Store original Confluence ID in payload
+                        confluencePageId: page.id,
                         title: page.title,
-                        spaceKey: page.space?.key || 'N/A', // Assuming space key might be available
-                        content: textContent, // Store the cleaned text content
+                        spaceKey: page.space?.key || 'N/A',
+                        content: textContent,
                         url: `${CONFLUENCE_BASE_URL}/pages/viewpage.action?pageId=${page.id}`,
                         lastModified: page._expandable?.lastModified || new Date().toISOString(),
-                        // Add any other metadata you want to store and filter on
                     },
                 },
             ],
@@ -279,28 +183,20 @@ async function upsertToQdrant(page: ConfluencePage, embedding: number[], textCon
         console.log(`Upserted page '${page.title}' (ID: ${page.id}) to Qdrant.`);
     } catch (error) {
         console.error(`Error upserting page ${page.id} to Qdrant:`, error);
-        // Decide if you want to throw the error or just log it and continue
     }
 }
 
-/**
- * Main ETL process function.
- */
 async function main() {
-    const spaceKey = process.env.CONFLUENCE_SPACE_KEY;
-    if (!spaceKey) {
-        console.error('CONFLUENCE_SPACE_KEY not defined in .env file.');
+    // Use CONFLUENCE_SPACE_KEY from config.ts
+    if (!CONFLUENCE_SPACE_KEY) {
+        console.error('CONFLUENCE_SPACE_KEY not defined in .env file or config.');
         return;
     }
 
     try {
         console.log('Starting Confluence to Qdrant ETL process...');
-
-        // 1. Ensure Qdrant collection exists
         await ensureQdrantCollection();
-
-        // 2. Fetch pages from Confluence
-        const pages = await getConfluencePages(spaceKey);
+        const pages = await getConfluencePages(CONFLUENCE_SPACE_KEY); // Use imported constant
         if (pages.length === 0) {
             console.log('No pages found in the specified Confluence space.');
             return;
@@ -308,44 +204,35 @@ async function main() {
 
         console.log(`Processing ${pages.length} pages...`);
 
-        // 3. For each page: clean content, generate embedding, and upsert to Qdrant
         for (const page of pages) {
             console.log(`\nProcessing page: "${page.title}" (ID: ${page.id})`);
-
             const htmlContent = page.body?.storage?.value;
             if (!htmlContent) {
                 console.warn(`Page "${page.title}" (ID: ${page.id}) has no content. Skipping.`);
                 continue;
             }
-
             const plainTextContent = cleanHtmlContent(htmlContent);
             if (!plainTextContent) {
                 console.warn(`Page "${page.title}" (ID: ${page.id}) has no text after cleaning. Skipping.`);
                 continue;
             }
-
-            // For very long documents, consider chunking strategies
-            // For now, we embed the whole page content.
             console.log(`Generating embedding for "${page.title}"...`);
-            const embedding = await getOllamaEmbedding(plainTextContent);
-
+            const embedding = await getOllamaEmbedding(plainTextContent); // Uses imported function
             if (embedding && embedding.length > 0) {
                 await upsertToQdrant(page, embedding, plainTextContent);
             } else {
                 console.warn(`Failed to generate embedding for "${page.title}" (ID: ${page.id}). Skipping.`);
             }
         }
-
         console.log('\nETL process completed successfully!');
     } catch (error) {
         console.error('ETL process failed:', error);
-        process.exit(1); // Exit with error code
+        process.exit(1);
     }
 }
 
-// Command-line argument parsing and execution for ETL
 async function runEtl() {
-    const argv = await yargs(hideBin(process.argv))
+    await yargs(hideBin(process.argv))
         .command('etl', 'Run the full ETL process to ingest Confluence data into Qdrant', () => {}, async () => {
             console.log('Starting ETL process command...');
             await main();
@@ -357,73 +244,9 @@ async function runEtl() {
         .argv;
 }
 
-// If this file is executed directly, run the ETL command processor.
-// This allows `ts-node src/etl.ts etl`
 if (require.main === module) {
     runEtl();
 }
 
-// Note: The ConfluencePage interface was duplicated. Removing the second one.
-// The first definition of ConfluencePage (around line 23) is kept.
-// The getOllamaEmbedding function has been moved to search.ts
-// The qdrantClient, QDRANT_COLLECTION_NAME, OLLAMA_API_URL, OLLAMA_EMBEDDING_MODEL have been moved to search.ts
-// However, getOllamaEmbedding is still used by the main ETL process.
-// For now, we will duplicate getOllamaEmbedding in etl.ts or import it.
-// Let's re-add getOllamaEmbedding to etl.ts for now to keep ETL functional,
-// and then consider a shared utility file or passing instances if this becomes complex.
-
-/**
- * Generates embeddings for a given text using Ollama.
- * This is temporarily re-added here. Ideally, this should be in a shared utils file
- * or search.ts should provide it if it's the primary user.
- * @param text The text to embed.
- * @returns Promise<number[]>
- */
-async function getOllamaEmbedding(text: string): Promise<number[]> {
-    try {
-        const response = await axios.post<EmbeddingResponse>(
-            OLLAMA_API_URL, // This needs to be defined again or imported
-            {
-                model: OLLAMA_EMBEDDING_MODEL, // This needs to be defined again or imported
-                prompt: text,
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
-        return response.data.embedding;
-    } catch (e) {
-        const error = e as any; // Cast to any to access response data
-        console.error('Error generating embedding from Ollama (etl.ts):', error.response?.data || error.message);
-        throw error;
-    }
-}
-// Re-define necessary constants for getOllamaEmbedding if not imported
-// These were moved to search.ts, so etl.ts needs them too.
-// const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api/embeddings';
-// const OLLAMA_EMBEDDING_MODEL = process.env.OLLAMA_EMBEDDING_MODEL || 'mxbai-embed-large:latest';
-// The Qdrant client and collection name are also used by ETL.
-// const qdrantClient = new QdrantClient({ url: QDRANT_URL });
-// const QDRANT_COLLECTION_NAME = process.env.QDRANT_COLLECTION_NAME || 'confluence_embeddings';
-// const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333';
-
-// It's better to keep shared constants and clients in one place or pass them.
-// For now, since etl.ts is the primary user of Qdrant for *writing* and Confluence interaction,
-// let's keep Qdrant client and related constants (QDRANT_URL, QDRANT_COLLECTION_NAME) here.
-// getOllamaEmbedding and its constants (OLLAMA_API_URL, OLLAMA_EMBEDDING_MODEL) are used by both.
-// Let's define them in etl.ts and search.ts can import them or we create a shared config.
-
-// The following constants are already defined at the top of etl.ts and are kept:
-// CONFLUENCE_BASE_URL, CONFLUENCE_USERNAME, CONFLUENCE_PAT
-// OLLAMA_API_URL, QDRANT_URL, QDRANT_COLLECTION_NAME, OLLAMA_EMBEDDING_MODEL
-// qdrantClient
-
-// The `EmbeddingResponse` interface is also needed for `getOllamaEmbedding`
-interface EmbeddingResponse { // This might be duplicated if not handled carefully
-    embedding: number[];
-}
-
-// The `run()` function has been renamed to `runEtl()` and simplified.
-// The duplicate ConfluencePage interface will be removed by the diff.
+// Removed all trailing comments and duplicate function/interface definitions.
+// Ensured all imported constants and functions are used correctly.

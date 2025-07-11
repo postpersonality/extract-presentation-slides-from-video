@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node dist/etl.js",
-    "dev": "nodemon src/etl.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "start:etl": "ts-node src/etl.ts etl",
+    "start:search": "ts-node src/search.ts search"
   },
   "repository": {
     "type": "git",
@@ -25,7 +25,6 @@
     "@types/node": "^24.0.12",
     "@types/uuid": "^10.0.0",
     "@types/yargs": "^17.0.33",
-    "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },

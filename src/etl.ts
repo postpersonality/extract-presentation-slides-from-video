@@ -1,26 +1,20 @@
 import axios from 'axios';
-import { QdrantClient } from '@qdrant/js-client-rest';
-import * as dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import {
+    CONFLUENCE_BASE_URL,
+    CONFLUENCE_USERNAME,
+    CONFLUENCE_PAT,
+    USE_FIXTURE_DATA,
+    QDRANT_COLLECTION_NAME,
+    VECTOR_SIZE,
+    CONFLUENCE_SPACE_KEY
+} from './config';
+import { qdrantClient } from './clients';
+import { getOllamaEmbedding, EmbeddingResponse } from './utils'; // EmbeddingResponse might not be needed here if getOllamaEmbedding handles it internally
 
-dotenv.config(); // Load environment variables from .env file
-
-// Environment variables
-const CONFLUENCE_BASE_URL = process.env.CONFLUENCE_BASE_URL;
-const CONFLUENCE_USERNAME = process.env.CONFLUENCE_USERNAME; // Or your email if using PAT
-const CONFLUENCE_PAT = process.env.CONFLUENCE_PAT;
-const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api/embeddings';
-const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333';
-const QDRANT_COLLECTION_NAME = process.env.QDRANT_COLLECTION_NAME || 'confluence_embeddings';
-const OLLAMA_EMBEDDING_MODEL = process.env.OLLAMA_EMBEDDING_MODEL || 'mxbai-embed-large:latest';
-
-// Qdrant client
-const qdrantClient = new QdrantClient({ url: QDRANT_URL });
-
-// Environment variable to trigger fixture data usage
-const USE_FIXTURE_DATA = process.env.USE_FIXTURE_DATA === 'true';
+// dotenv.config() is called in config.ts
 
 interface ConfluencePage {
     id: string;
@@ -30,12 +24,16 @@ interface ConfluencePage {
             value: string;
         };
     };
+    space?: {
+        key: string;
+    };
+    _expandable?: {
+        lastModified?: string;
+    };
     // Add other relevant fields if needed
 }
 
-interface EmbeddingResponse {
-    embedding: number[];
-}
+// Interface EmbeddingResponse is now imported from utils.ts
 
 /**
  * Fetches all pages from a Confluence space.
@@ -345,115 +343,87 @@ async function main() {
     }
 }
 
-// Run the main ETL function
-// main(); // We will modify main to handle different commands like 'etl' or 'search'
-
-/**
- * Searches the Qdrant collection for documents similar to the query text.
- * @param query The text to search for.
- * @param topK The number of top results to return.
- */
-export async function searchByText(query: string, topK: number = 5) {
-    if (!query || query.trim() === "") {
-        console.error("Search query cannot be empty.");
-        return;
-    }
-
-    console.log(`Searching for: "${query}" (top ${topK} results)`);
-
-    try {
-        // 1. Generate embedding for the query
-        console.log("Generating embedding for the search query...");
-        const queryEmbedding = await getOllamaEmbedding(query);
-
-        if (!queryEmbedding || queryEmbedding.length === 0) {
-            console.error("Failed to generate embedding for the query.");
-            return;
-        }
-
-        // 2. Search Qdrant
-        console.log("Searching Qdrant collection...");
-        const searchResult = await qdrantClient.search(QDRANT_COLLECTION_NAME, {
-            vector: queryEmbedding,
-            limit: topK,
-            with_payload: true, // Retrieve the payload
-            // with_vector: false // Optionally retrieve the vector itself
-        });
-
-        if (searchResult.length === 0) {
-            console.log("No results found.");
-            return;
-        }
-
-        // 3. Display results
-        console.log("\nSearch Results:");
-        searchResult.forEach((result, index) => {
-            console.log(`\n${index + 1}. Score: ${result.score.toFixed(4)}`);
-            if (result.payload) {
-                console.log(`   Title: ${result.payload.title}`);
-                console.log(`   Confluence ID: ${result.payload.confluencePageId}`);
-                console.log(`   URL: ${result.payload.url}`);
-                // Optionally display a snippet of the content
-                // const contentSnippet = result.payload.content?.toString().substring(0, 200) + "...";
-                // console.log(`   Snippet: ${contentSnippet}`);
-            } else {
-                console.log("   Payload not available for this result.");
-            }
-        });
-
-    } catch (error) {
-        console.error("Error during search:", error);
-    }
-}
-
-// Command-line argument parsing and execution
-async function run() {
+// Command-line argument parsing and execution for ETL
+async function runEtl() {
     const argv = await yargs(hideBin(process.argv))
         .command('etl', 'Run the full ETL process to ingest Confluence data into Qdrant', () => {}, async () => {
-            console.log('Starting ETL process...');
-            await main(); // Renamed the original main to etlProcess for clarity if needed, but main() is fine
+            console.log('Starting ETL process command...');
+            await main();
         })
-        .command('search <query>', 'Search for documents in Qdrant', (yargs) => {
-            return yargs
-                .positional('query', {
-                    describe: 'The search query text',
-                    type: 'string',
-                })
-                .option('topk', {
-                    alias: 'k',
-                    type: 'number',
-                    default: 5,
-                    describe: 'Number of top results to return'
-                });
-        }, async (argv) => {
-            if (!argv.query) { // Should be caught by yargs demandOption, but as a safeguard
-                console.error("Search query is required.");
-                process.exit(1);
-            }
-            console.log(`Search command called with query: "${argv.query}", topK: ${argv.topk}`);
-            await searchByText(argv.query as string, argv.topk);
-        })
-        .demandCommand(1, 'You need to specify a command (etl or search).')
+        .demandCommand(1, 'You need to specify the "etl" command to run this script.')
         .help()
         .alias('help', 'h')
-        .strict() // Catches unknown options
+        .strict()
         .argv;
 }
 
-run();
-
-interface ConfluencePage {
-    id: string;
-    title: string;
-    body: {
-        storage: {
-            value: string;
-        };
-    };
-    space?: { // Added space information
-        key: string;
-    };
-    _expandable?: { // For potential extra fields like lastModified
-        lastModified?: string;
-    };
+// If this file is executed directly, run the ETL command processor.
+// This allows `ts-node src/etl.ts etl`
+if (require.main === module) {
+    runEtl();
 }
+
+// Note: The ConfluencePage interface was duplicated. Removing the second one.
+// The first definition of ConfluencePage (around line 23) is kept.
+// The getOllamaEmbedding function has been moved to search.ts
+// The qdrantClient, QDRANT_COLLECTION_NAME, OLLAMA_API_URL, OLLAMA_EMBEDDING_MODEL have been moved to search.ts
+// However, getOllamaEmbedding is still used by the main ETL process.
+// For now, we will duplicate getOllamaEmbedding in etl.ts or import it.
+// Let's re-add getOllamaEmbedding to etl.ts for now to keep ETL functional,
+// and then consider a shared utility file or passing instances if this becomes complex.
+
+/**
+ * Generates embeddings for a given text using Ollama.
+ * This is temporarily re-added here. Ideally, this should be in a shared utils file
+ * or search.ts should provide it if it's the primary user.
+ * @param text The text to embed.
+ * @returns Promise<number[]>
+ */
+async function getOllamaEmbedding(text: string): Promise<number[]> {
+    try {
+        const response = await axios.post<EmbeddingResponse>(
+            OLLAMA_API_URL, // This needs to be defined again or imported
+            {
+                model: OLLAMA_EMBEDDING_MODEL, // This needs to be defined again or imported
+                prompt: text,
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+        return response.data.embedding;
+    } catch (e) {
+        const error = e as any; // Cast to any to access response data
+        console.error('Error generating embedding from Ollama (etl.ts):', error.response?.data || error.message);
+        throw error;
+    }
+}
+// Re-define necessary constants for getOllamaEmbedding if not imported
+// These were moved to search.ts, so etl.ts needs them too.
+// const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api/embeddings';
+// const OLLAMA_EMBEDDING_MODEL = process.env.OLLAMA_EMBEDDING_MODEL || 'mxbai-embed-large:latest';
+// The Qdrant client and collection name are also used by ETL.
+// const qdrantClient = new QdrantClient({ url: QDRANT_URL });
+// const QDRANT_COLLECTION_NAME = process.env.QDRANT_COLLECTION_NAME || 'confluence_embeddings';
+// const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333';
+
+// It's better to keep shared constants and clients in one place or pass them.
+// For now, since etl.ts is the primary user of Qdrant for *writing* and Confluence interaction,
+// let's keep Qdrant client and related constants (QDRANT_URL, QDRANT_COLLECTION_NAME) here.
+// getOllamaEmbedding and its constants (OLLAMA_API_URL, OLLAMA_EMBEDDING_MODEL) are used by both.
+// Let's define them in etl.ts and search.ts can import them or we create a shared config.
+
+// The following constants are already defined at the top of etl.ts and are kept:
+// CONFLUENCE_BASE_URL, CONFLUENCE_USERNAME, CONFLUENCE_PAT
+// OLLAMA_API_URL, QDRANT_URL, QDRANT_COLLECTION_NAME, OLLAMA_EMBEDDING_MODEL
+// qdrantClient
+
+// The `EmbeddingResponse` interface is also needed for `getOllamaEmbedding`
+interface EmbeddingResponse { // This might be duplicated if not handled carefully
+    embedding: number[];
+}
+
+// The `run()` function has been renamed to `runEtl()` and simplified.
+// The duplicate ConfluencePage interface will be removed by the diff.

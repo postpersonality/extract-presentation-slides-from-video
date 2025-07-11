@@ -5,13 +5,6 @@ services:
       - "${OLLAMA_HOST_PORT:-11434}:11434"
     volumes:
       - ./ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia # GPU support is optional, remove if not needed or causes issues
-              count: 1
-              capabilities: [gpu]
     command: sh -c "ollama pull ${OLLAMA_EMBEDDING_MODEL:-all-minilm:l6-v2} && ollama serve"
 
   qdrant:

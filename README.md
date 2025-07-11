@@ -58,7 +58,7 @@ This project implements an ETL (Extract, Transform, Load) process to fetch conte
 4.  **Start Ollama and Qdrant services:**
     This command will also pull the `mxbai-embed-large:latest` model for Ollama if it's not already present locally.
     ```bash
-    docker-compose up -d
+    docker compose up -d
     ```
     - Ollama will be accessible at `http://localhost:11434`.
     - Qdrant will be accessible at `http://localhost:6333`.

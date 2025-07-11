@@ -148,7 +148,8 @@ async function getConfluencePages(spaceKey: string): Promise<ConfluencePage[]> {
                 start += limit;
             }
             console.log(`Fetched ${pages.length} pages, total so far: ${allPages.length}`);
-        } catch (error) {
+        } catch (e) {
+            const error = e as any; // Cast to any to access response data
             console.error('Error fetching pages from Confluence:', error.response?.data || error.message);
             throw error;
         }
@@ -177,7 +178,8 @@ async function getOllamaEmbedding(text: string): Promise<number[]> {
             }
         );
         return response.data.embedding;
-    } catch (error) {
+    } catch (e) {
+        const error = e as any; // Cast to any to access response data
         console.error('Error generating embedding from Ollama:', error.response?.data || error.message);
         throw error;
     }
@@ -259,7 +261,7 @@ async function upsertToQdrant(page: ConfluencePage, embedding: number[], textCon
     }
 
     try {
-        await qdrantClient.upsertPoints(QDRANT_COLLECTION_NAME, {
+        await qdrantClient.upsert(QDRANT_COLLECTION_NAME, {
             points: [
                 {
                     id: qdrantId,
@@ -440,16 +442,7 @@ async function run() {
 
 run();
 
-declare module 'axios' {
-    export interface AxiosRequestConfig {
-      auth?: {
-        username?: string;
-        password?: string;
-      };
-    }
-  }
-
-  interface ConfluencePage {
+interface ConfluencePage {
     id: string;
     title: string;
     body: {
@@ -463,5 +456,4 @@ declare module 'axios' {
     _expandable?: { // For potential extra fields like lastModified
         lastModified?: string;
     };
-    // Add other relevant fields if needed
 }

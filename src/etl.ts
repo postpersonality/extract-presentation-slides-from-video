@@ -2,6 +2,8 @@ import axios from 'axios';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import * as dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
 dotenv.config(); // Load environment variables from .env file
 
@@ -342,7 +344,102 @@ async function main() {
 }
 
 // Run the main ETL function
-main();
+// main(); // We will modify main to handle different commands like 'etl' or 'search'
+
+/**
+ * Searches the Qdrant collection for documents similar to the query text.
+ * @param query The text to search for.
+ * @param topK The number of top results to return.
+ */
+export async function searchByText(query: string, topK: number = 5) {
+    if (!query || query.trim() === "") {
+        console.error("Search query cannot be empty.");
+        return;
+    }
+
+    console.log(`Searching for: "${query}" (top ${topK} results)`);
+
+    try {
+        // 1. Generate embedding for the query
+        console.log("Generating embedding for the search query...");
+        const queryEmbedding = await getOllamaEmbedding(query);
+
+        if (!queryEmbedding || queryEmbedding.length === 0) {
+            console.error("Failed to generate embedding for the query.");
+            return;
+        }
+
+        // 2. Search Qdrant
+        console.log("Searching Qdrant collection...");
+        const searchResult = await qdrantClient.search(QDRANT_COLLECTION_NAME, {
+            vector: queryEmbedding,
+            limit: topK,
+            with_payload: true, // Retrieve the payload
+            // with_vector: false // Optionally retrieve the vector itself
+        });
+
+        if (searchResult.length === 0) {
+            console.log("No results found.");
+            return;
+        }
+
+        // 3. Display results
+        console.log("\nSearch Results:");
+        searchResult.forEach((result, index) => {
+            console.log(`\n${index + 1}. Score: ${result.score.toFixed(4)}`);
+            if (result.payload) {
+                console.log(`   Title: ${result.payload.title}`);
+                console.log(`   Confluence ID: ${result.payload.confluencePageId}`);
+                console.log(`   URL: ${result.payload.url}`);
+                // Optionally display a snippet of the content
+                // const contentSnippet = result.payload.content?.toString().substring(0, 200) + "...";
+                // console.log(`   Snippet: ${contentSnippet}`);
+            } else {
+                console.log("   Payload not available for this result.");
+            }
+        });
+
+    } catch (error) {
+        console.error("Error during search:", error);
+    }
+}
+
+// Command-line argument parsing and execution
+async function run() {
+    const argv = await yargs(hideBin(process.argv))
+        .command('etl', 'Run the full ETL process to ingest Confluence data into Qdrant', () => {}, async () => {
+            console.log('Starting ETL process...');
+            await main(); // Renamed the original main to etlProcess for clarity if needed, but main() is fine
+        })
+        .command('search <query>', 'Search for documents in Qdrant', (yargs) => {
+            return yargs
+                .positional('query', {
+                    describe: 'The search query text',
+                    type: 'string',
+                })
+                .option('topk', {
+                    alias: 'k',
+                    type: 'number',
+                    default: 5,
+                    describe: 'Number of top results to return'
+                });
+        }, async (argv) => {
+            if (!argv.query) { // Should be caught by yargs demandOption, but as a safeguard
+                console.error("Search query is required.");
+                process.exit(1);
+            }
+            console.log(`Search command called with query: "${argv.query}", topK: ${argv.topk}`);
+            await searchByText(argv.query as string, argv.topk);
+        })
+        .demandCommand(1, 'You need to specify a command (etl or search).')
+        .help()
+        .alias('help', 'h')
+        .strict() // Catches unknown options
+        .argv;
+}
+
+run();
+
 declare module 'axios' {
     export interface AxiosRequestConfig {
       auth?: {

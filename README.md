@@ -75,14 +75,35 @@ This project implements an ETL (Extract, Transform, Load) process to fetch conte
 
 2.  **Run the ETL process:**
     ```bash
-    npm start
+    npm start -- etl
     ```
-    This will execute the compiled JavaScript code in `dist/etl.js`.
+    This will execute the ETL process (fetching, embedding, and storing data).
 
-    Alternatively, for development, you can run the script directly using `ts-node` with `nodemon` for automatic restarts on file changes:
+    Alternatively, for development, you can run the script directly using `ts-node` with `nodemon`:
     ```bash
-    npm run dev
+    npm run dev -- etl
     ```
+
+### Searching Indexed Content
+
+Once data has been indexed, you can search it using the `search` command:
+
+```bash
+npm start -- search "your search query here"
+```
+Or for development:
+```bash
+npm run dev -- search "your search query here"
+```
+
+**Search Options:**
+-   `<query>`: (Required) The text you want to search for. Must be enclosed in quotes if it contains spaces.
+-   `--topk <number>` or `-k <number>`: (Optional) The number of top results to return. Defaults to 5.
+
+Example:
+```bash
+npm start -- search "how to use docker compose" -k 10
+```
 
 ## How it Works
 

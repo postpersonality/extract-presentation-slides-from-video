@@ -90,9 +90,13 @@ This project implements an ETL (Extract, Transform, Load) process to fetch conte
 2.  It fetches all pages from the specified `CONFLUENCE_SPACE_KEY`, handling pagination.
 3.  For each page:
     a.  The HTML content (`body.storage`) is cleaned to extract plain text.
-    b.  The plain text is sent to the local Ollama API (`/api/embeddings`) to generate a vector embedding using the `mxbai-embed-large` model.
-    c.  The script ensures a Qdrant collection (defined by `QDRANT_COLLECTION_NAME`) exists, creating it if necessary. The collection is configured for vectors of size 1024 (matching `mxbai-embed-large`) using Cosine distance.
-    d.  The page ID, embedding vector, title, cleaned text content, and Confluence page URL are upserted into the Qdrant collection.
+    b.  The plain text is sent to the local Ollama API (`/api/embeddings`) to generate a vector embedding using the model specified by `OLLAMA_EMBEDDING_MODEL`.
+    c.  The script ensures a Qdrant collection (defined by `QDRANT_COLLECTION_NAME`) exists, creating it if necessary. The collection's vector size is dynamically set based on `OLLAMA_EMBEDDING_MODEL` (e.g., 384 for `all-minilm:l6-v2`).
+    d.  The page data is upserted into the Qdrant collection.
+        - Qdrant point IDs are generated as UUIDs when using fixture data.
+        - For actual Confluence data, Confluence page IDs are parsed as integers to be used as Qdrant point IDs. If a Confluence page ID cannot be parsed as an integer, a UUID is generated as a fallback.
+        - The original Confluence page ID is always stored in the Qdrant point's payload under the `confluencePageId` field for reference.
+        - Other payload data includes the title, cleaned text content, and Confluence page URL.
 
 ## Stopping Services
 

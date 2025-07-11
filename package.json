@@ -23,6 +23,7 @@
   "homepage": "https://github.com/postpersonality/extract-presentation-slides-from-video#readme",
   "devDependencies": {
     "@types/node": "^24.0.12",
+    "@types/uuid": "^10.0.0",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
@@ -31,6 +32,7 @@
     "@qdrant/js-client-rest": "^1.14.1",
     "axios": "^1.10.0",
     "confluence-api": "^1.4.0",
-    "dotenv": "^17.2.0"
+    "dotenv": "^17.2.0",
+    "uuid": "^11.1.0"
   }
 }

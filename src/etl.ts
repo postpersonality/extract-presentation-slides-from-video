@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import * as dotenv from 'dotenv';
+import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config(); // Load environment variables from .env file
 
@@ -43,9 +44,10 @@ interface EmbeddingResponse {
 async function getConfluencePages(spaceKey: string): Promise<ConfluencePage[]> {
     if (USE_FIXTURE_DATA) {
         console.log('Using fixture data for Confluence pages.');
+        // Generate UUIDs for fixture data IDs to be Qdrant compatible
         return [
             {
-                id: 'fixture1',
+                id: uuidv4(), // Qdrant compatible ID
                 title: 'Fixture Page 1 - English & Русский',
                 body: {
                     storage: {
@@ -56,7 +58,7 @@ async function getConfluencePages(spaceKey: string): Promise<ConfluencePage[]> {
                 _expandable: { lastModified: new Date().toISOString() }
             },
             {
-                id: 'fixture2',
+                id: uuidv4(), // Qdrant compatible ID
                 title: 'Fixture Page 2 - Only English',
                 body: {
                     storage: {
@@ -67,7 +69,7 @@ async function getConfluencePages(spaceKey: string): Promise<ConfluencePage[]> {
                 _expandable: { lastModified: new Date().toISOString() }
             },
             {
-                id: 'fixture3',
+                id: uuidv4(), // Qdrant compatible ID
                 title: 'Страница на русском языке - Russian Only',
                 body: {
                     storage: {
@@ -78,7 +80,7 @@ async function getConfluencePages(spaceKey: string): Promise<ConfluencePage[]> {
                 _expandable: { lastModified: new Date().toISOString() }
             },
             {
-                id: 'fixture4',
+                id: uuidv4(), // Qdrant compatible ID
                 title: 'Page with no real content',
                 body: {
                     storage: {
@@ -89,7 +91,7 @@ async function getConfluencePages(spaceKey: string): Promise<ConfluencePage[]> {
                 _expandable: { lastModified: new Date().toISOString() }
             },
             {
-                id: 'fixture5',
+                id: uuidv4(), // Qdrant compatible ID
                 title: 'Page with empty content value',
                 body: {
                     storage: {
@@ -237,13 +239,31 @@ async function ensureQdrantCollection() {
  * @param embedding The embedding vector.
  */
 async function upsertToQdrant(page: ConfluencePage, embedding: number[], textContent: string) {
+    let qdrantId: number | string;
+
+    if (USE_FIXTURE_DATA) {
+        // Fixture data IDs are already UUIDs (strings)
+        qdrantId = page.id;
+    } else {
+        // For real Confluence data, try to parse ID as integer
+        const parsedId = parseInt(page.id, 10);
+        if (!isNaN(parsedId)) {
+            qdrantId = parsedId;
+        } else {
+            // If Confluence ID is not a number (unexpected, but good to handle), generate a UUID
+            console.warn(`Confluence page ID "${page.id}" is not an integer. Generating UUID for Qdrant point.`);
+            qdrantId = uuidv4();
+        }
+    }
+
     try {
         await qdrantClient.upsertPoints(QDRANT_COLLECTION_NAME, {
             points: [
                 {
-                    id: page.id, // Use Confluence page ID as Qdrant point ID
+                    id: qdrantId,
                     vector: embedding,
                     payload: {
+                        confluencePageId: page.id, // Store original Confluence ID in payload
                         title: page.title,
                         spaceKey: page.space?.key || 'N/A', // Assuming space key might be available
                         content: textContent, // Store the cleaned text content
